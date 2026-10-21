@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>청약 데이터 인프라 가이드</title>
+<meta name="description" content="공공 API로 청약 공고를 매일 모아 접수 자격과 안전마진을 계산하고 알림·노트·공개 페이지로 내는 시스템을 만든 과정과 방법.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--paper:#FAF8F4;--ink:#141B26;--ink-2:#3A4453;--muted:#6E7685;--rule:#DFDAD0;--rule-2:#EDE9E1;--card:#FFFFFF;
+--stamp:#C1440E;--stamp-soft:#F0DED4;--jade:#1F6B5C;--jade-soft:#D8E7E0;--amber:#8A6A12;--amber-soft:#F3EAD0;
+--serif:"Gowun Batang",'Nanum Myeongjo',serif;--sans:"IBM Plex Sans KR",system-ui,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#11161E;--ink:#E9E5DC;--ink-2:#BDB7AB;--muted:#8A9099;--rule:#2A323D;--rule-2:#1C232C;--card:#161D26;--stamp:#E4794A;--stamp-soft:#3A2419;--jade:#5FB39C;--jade-soft:#16302A;--amber:#D9B25A;--amber-soft:#3A3117}}
+:root[data-theme="dark"]{--paper:#11161E;--ink:#E9E5DC;--ink-2:#BDB7AB;--muted:#8A9099;--rule:#2A323D;--rule-2:#1C232C;--card:#161D26;--stamp:#E4794A;--stamp-soft:#3A2419;--jade:#5FB39C;--jade-soft:#16302A;--amber:#D9B25A;--amber-soft:#3A3117}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-weight:300;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:980px;margin:0 auto;padding-inline:20px;padding-block:0 72px}
+h1,h2,h3{font-family:var(--serif);font-weight:700;text-wrap:balance;margin:0}a{color:var(--stamp);text-underline-offset:3px}
+header{border-bottom:2px solid var(--ink);padding-block:52px 18px}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--stamp);margin-bottom:14px}
+h1{font-size:clamp(2rem,6vw,3.1rem);line-height:1.12}
+.lede{font-size:1.04rem;color:var(--ink-2);margin:14px 0 0;max-width:56ch}
+.prov{display:flex;flex-wrap:wrap;gap:6px 22px;font-family:var(--mono);font-size:.74rem;color:var(--muted);border-top:1px solid var(--rule);margin-top:24px;padding-top:12px}
+.prov b{font-weight:500;color:var(--ink-2)}.prov a{color:var(--ink-2)}
+section{padding-block:38px;border-bottom:1px solid var(--rule-2)}
+h2{font-size:1.38rem;margin-bottom:6px}h2 small{font-family:var(--mono);font-size:.78rem;font-weight:400;color:var(--muted);margin-left:8px}
+h3{font-size:1.05rem;margin:22px 0 6px}
+.sub{color:var(--muted);font-size:.9rem;margin:0 0 18px}
+p{max-width:68ch}
+.note{border-left:3px solid var(--stamp);background:var(--stamp-soft);padding:16px 20px;border-radius:0 4px 4px 0;max-width:66ch;margin:16px 0}
+.note p{margin:0;font-size:.95rem}.note p+p{margin-top:8px}
+.note.jade{border-left-color:var(--jade);background:var(--jade-soft)}
+.note.amber{border-left-color:var(--amber);background:var(--amber-soft)}
+.note b{font-weight:600}
+.limits{list-style:none;padding:0;margin:0;display:grid;gap:12px;max-width:66ch}
+.limits li{padding-left:24px;position:relative;color:var(--ink-2);font-size:.92rem}.limits li::before{content:"—";position:absolute;left:0;color:var(--stamp);font-family:var(--mono)}
+.limits b{color:var(--ink);font-weight:500}
+footer{padding-top:30px;color:var(--muted);font-size:.78rem;font-family:var(--mono)}
+/* 추가: 목차 */
+nav.toc{margin-top:22px;font-size:.86rem}
+nav.toc ol{margin:0;padding-left:1.4em;columns:2;column-gap:28px}
+nav.toc li{break-inside:avoid;color:var(--muted)}nav.toc a{color:var(--ink-2)}
+/* 추가: 흐름도 */
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:20px 0 8px}
+.flow .node{flex:1 1 140px;background:var(--card);border:1px solid var(--rule);padding:12px 14px;min-width:0}
+.flow .node b{display:block;font-family:var(--serif);font-size:.98rem;color:var(--ink)}
+.flow .node span{display:block;font-size:.78rem;color:var(--muted);line-height:1.5;margin-top:4px}
+.flow .node.src{border-top:3px solid var(--ink-2)}
+.flow .node.core{border-top:3px solid var(--amber)}
+.flow .node.out{border-top:3px solid var(--jade)}
+.flow .arr{flex:0 0 22px;display:flex;align-items:center;justify-content:center;color:var(--stamp);font-family:var(--mono);font-size:1rem}
+.outs{display:grid;gap:6px;flex:1 1 160px}
+.outs .node{flex:none}
+@media (max-width:720px){.flow{flex-direction:column}.flow .node,.outs{flex:none}.flow .arr{flex:none;height:26px}.flow .arr::after{content:"↓"}.flow .arr i{display:none}}
+@media (min-width:721px){.flow .arr::after{content:""}}
+/* 추가: 표 */
+.scroll{overflow-x:auto;border:1px solid var(--rule-2);margin:14px 0;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:.84rem}
+thead th{text-align:left;font-weight:500;font-family:var(--sans);font-size:.74rem;letter-spacing:.02em;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--rule);white-space:nowrap;background:var(--card)}
+tbody td{padding:9px 12px;border-bottom:1px solid var(--rule-2);vertical-align:top;color:var(--ink-2)}
+tbody tr:last-child td{border-bottom:0}
+tbody td:first-child{color:var(--ink);font-weight:500}
+td.m,th.m{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+table.compact{min-width:0}table.compact td,table.compact th{padding:8px 8px}
+.hint{display:none;font-size:.74rem;color:var(--muted);margin:10px 0 -8px}
+@media (max-width:600px){.hint{display:block}}
+/* 추가: 함정 카드 */
+.pits{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin:16px 0}
+.pit{background:var(--card);border:1px solid var(--rule);border-top:3px solid var(--stamp);padding:12px 16px}
+.pit h3{margin:0 0 6px;font-size:1rem}
+.pit p{margin:4px 0 0;font-size:.88rem;color:var(--ink-2)}
+.pit p b{font-weight:500;color:var(--ink)}
+/* 추가: 코드 */
+code{font-family:var(--mono);font-size:.84em;background:var(--rule-2);padding:1px 5px;border-radius:3px;overflow-wrap:anywhere}
+pre{background:var(--card);border:1px solid var(--rule);padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:.78rem;line-height:1.6;margin:12px 0;color:var(--ink);max-width:100%}
+pre code{background:none;padding:0;font-size:inherit;overflow-wrap:normal}
+.cap{font-family:var(--mono);font-size:.7rem;color:var(--muted);margin:14px 0 -6px;letter-spacing:.04em}
+/* 추가: 접기 */
+details{border:1px solid var(--rule);background:var(--card);margin:18px 0 0;max-width:100%}
+details>summary{cursor:pointer;padding:11px 16px;font-family:var(--mono);font-size:.76rem;letter-spacing:.06em;color:var(--ink-2);list-style:none;display:flex;gap:10px;align-items:center}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"+";color:var(--stamp);font-weight:500;width:1em}
+details[open]>summary::before{content:"−"}
+details[open]>summary{border-bottom:1px solid var(--rule-2)}
+details .dbody{padding:4px 16px 16px;min-width:0}
+details .dbody p,details .dbody li{font-size:.9rem}
+details .dbody ul{padding-left:1.2em}
+/* 추가: 단계 목록 */
+ol.steps{list-style:none;counter-reset:s;padding:0;margin:16px 0;display:grid;gap:10px;max-width:72ch}
+ol.steps>li{counter-increment:s;position:relative;padding:12px 16px 12px 54px;background:var(--card);border:1px solid var(--rule);font-size:.92rem;color:var(--ink-2)}
+ol.steps>li::before{content:counter(s,decimal-leading-zero);position:absolute;left:16px;top:12px;font-family:var(--mono);font-size:.8rem;color:var(--stamp);font-weight:500}
+ol.steps>li b{color:var(--ink);font-weight:500}
+ul.plain{padding-left:1.2em;max-width:68ch}ul.plain li{margin:4px 0}
+/* 추가: 타임라인 */
+.tl{list-style:none;padding:0;margin:16px 0;border-left:2px solid var(--rule);max-width:70ch}
+.tl li{position:relative;padding:0 0 14px 20px;font-size:.9rem;color:var(--ink-2)}
+.tl li::before{content:"";position:absolute;left:-6px;top:8px;width:10px;height:10px;border-radius:50%;background:var(--paper);border:2px solid var(--stamp)}
+.tl .when{display:block;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:2px;margin:16px 0;max-width:640px}
+.stats div{background:var(--card);border:1px solid var(--rule);padding:12px 14px}
+.stats b{display:block;font-family:var(--mono);font-size:1.3rem;font-weight:500;color:var(--ink)}
+.stats span{font-size:.78rem;color:var(--muted)}
+@media (max-width:560px){header{padding-block:36px 16px}section{padding-block:28px}nav.toc ol{columns:1}ol.steps>li{padding-left:46px}ol.steps>li::before{left:12px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">GUIDE</div>
+  <h1>청약 데이터 인프라 만드는 법</h1>
+  <p class="lede">매일 아침 청약 공고를 공공 API로 모으고, 내 조건으로 접수 자격을 가린 뒤 알림·노트·공개 페이지로 내보내는 시스템입니다. 어떻게 생겼고, 어디서 넘어졌고, 직접 만들려면 무엇부터 하면 되는지 정리했습니다.</p>
+  <div class="prov">
+    <span><b>작성</b> 2026-10-21</span>
+    <span><b>대상</b> 부동산 공부방 — 비개발자도 읽을 수 있게, 개발 세부는 접어 둠</span>
+    <span><b>관련 페이지</b> <a href="https://megabytekim.github.io/chungyak/">지금 열린 청약</a> · <a href="https://megabytekim.github.io/chungyak/seoul.html">서울 분양가 랭킹</a> (2026-10-21 발행본 — 수동 발행이라 기준일 확인)</span>
+  </div>
+  <nav class="toc" aria-label="목차">
+    <ol>
+      <li><a href="#what">이게 뭘 해주나</a></li>
+      <li><a href="#arch">전체 구조 한 장</a></li>
+      <li><a href="#data">쓰는 데이터와 받는 법</a></li>
+      <li><a href="#pitfalls">공공 API에서 밟은 함정</a></li>
+      <li><a href="#eligibility">청약 자격을 어떻게 가리나</a></li>
+      <li><a href="#margin">안전마진 계산</a></li>
+      <li><a href="#ops">매일 돌리는 법</a></li>
+      <li><a href="#diy">직접 만들어 보려면</a></li>
+      <li><a href="#limits">한계와 주의</a></li>
+    </ol>
+  </nav>
+</header>
+
+<!-- 1 -->
+<section id="what">
+  <h2>이게 뭘 해주나</h2>
+  <p>청약홈에는 매일 새 공고가 올라옵니다. 하나하나 열어 보고 "내가 1순위인가", "주변 시세보다 싼가"를 따지는 건 손이 많이 갑니다. 이 시스템은 그 반복 작업을 대신합니다.</p>
+  <ul class="limits">
+    <li><b>모은다.</b> 매일 한 번 공공 API(프로그램이 데이터를 받아 가는 공식 창구)에서 분양 공고, 주택형·분양가, 경쟁률, 무순위(줍줍) 공고, 아파트 실거래가를 받아 DB(데이터를 쌓아 두는 파일 하나)에 쌓습니다.</li>
+    <li><b>가린다.</b> 미리 적어 둔 내 조건(통장 가입기간, 예치금, 세대주 여부, 거주지)으로 공고마다 접수 순위를 판정합니다.</li>
+    <li><b>잰다.</b> 분양가를 같은 구·비슷한 면적의 최근 실거래와 비교해 "안전마진"을 숫자로 냅니다.</li>
+    <li><b>알린다.</b> 텔레그램 알림은 네 가지뿐입니다. 1순위 접수 3일 전, 새 1순위 공고, 관심 지역 무순위의 접수일과 새 공고. 나머지는 "지금 볼 공고"를 한 장으로 요약한 노트(이하 <b>레이더 노트</b>)를 매일 조용히 덮어씁니다. 공개용 웹 페이지 두 장은 따로 손으로 발행합니다.</li>
+  </ul>
+  <div class="note"><p><b>당첨을 예측하지 않습니다.</b> 이 시스템이 가리는 것은 "접수할 수 있는 순위"입니다. 가점, 특별공급, 당첨 가능성은 계산하지 않습니다.</p></div>
+</section>
+
+<!-- 2 -->
+<section id="arch">
+  <h2>전체 구조 한 장</h2>
+  <p class="sub">왼쪽에서 오른쪽으로 하루 한 번 흐릅니다. 공개 페이지만 이 흐름 밖에서 손으로 발행합니다. 수집과 판정은 사람 손 없이 파이썬 프로그램만으로 돕니다.</p>
+  <div class="flow" role="img" aria-label="공공 API에서 수집, DB, 판정과 안전마진을 거쳐 텔레그램·노트·공개 페이지로 나가는 흐름">
+    <div class="node src"><b>공공 API</b><span>청약홈 5종(JSON)<br>국토부 실거래가(XML)<br>HUG 분양가(CSV, 월 1회)</span></div>
+    <div class="arr"><i>→</i></div>
+    <div class="node src"><b>수집</b><span>소스별로 따로 돈다. 하나가 죽어도 나머지는 계속.</span></div>
+    <div class="arr"><i>→</i></div>
+    <div class="node core"><b>DB</b><span>데이터 파일 하나. 표 10개. 실행 기록도 남김.</span></div>
+    <div class="arr"><i>→</i></div>
+    <div class="node core"><b>판정 · 안전마진</b><span>접수 순위 5종 판정. 분양가를 주변 실거래의 싼 쪽 4분의 1 지점과 비교(6장).</span></div>
+    <div class="arr"><i>→</i></div>
+    <div class="outs">
+      <div class="node out"><b>텔레그램</b><span>D-3 · 신규 · 무순위</span></div>
+      <div class="node out"><b>레이더 노트</b><span>매일 한 장 덮어쓰기</span></div>
+      <div class="node out"><b>공개 페이지</b><span>GitHub Pages 2장 · 수동 발행(매일 흐름 밖)</span></div>
+    </div>
+  </div>
+  <details>
+    <summary>개발자용 — 구성 요소</summary>
+    <div class="dbody">
+      <ul>
+        <li>DB는 SQLite입니다. 수집기(<code>collectors/</code>)와 판정 로직(<code>core/</code>)은 순수 파이썬입니다.</li>
+        <li>외부 의존성은 PyYAML과 pytest 두 개입니다. HTTP는 <code>urllib</code>, XML은 <code>xml.etree</code>, CSV는 <code>csv</code>, DB는 <code>sqlite3</code> 표준 라이브러리로 처리합니다.</li>
+        <li>DB 파일은 코드 저장소 밖에 둡니다. 모든 소스가 과거분을 다시 받을 수 있어서 DB는 캐시에 가깝고, 저장소에 바이너리를 넣을 이유가 없습니다.</li>
+        <li>테이블 10개: <code>notice</code>, <code>notice_unit</code>, <code>rate</code>, <code>trade</code>, <code>unsold</code>, <code>hug_price</code>, <code>match</code>, <code>collector_run</code>, <code>remainder_notice</code>, <code>remainder_unit</code>. 미분양(<code>unsold</code>)은 인증키가 아직 없어 테이블만 있습니다.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<!-- 3 -->
+<section id="data">
+  <h2>쓰는 데이터와 받는 법</h2>
+  <p>재료는 전부 공공데이터포털(data.go.kr)에서 무료로 받습니다. 회원가입 후 "활용신청"을 누르면 인증키(내 계정에 발급되는 접속용 비밀 문자열)가 나옵니다. 키 하나로 여러 API를 부를 수 있습니다. 아래 표의 JSON·XML·CSV는 데이터 파일 모양의 이름이니 몰라도 됩니다.</p>
+
+  <div class="scroll"><table>
+    <thead><tr><th>데이터</th><th>무엇을 주나</th><th>형식</th><th>주기</th></tr></thead>
+    <tbody>
+      <tr><td>청약홈 분양 공고</td><td>공고번호, 단지명, 주소, 민영/국민, 접수일, 발표일, 규제지역 플래그, 공고 원문 링크. 분양가는 없음.</td><td class="m">JSON</td><td>매일</td></tr>
+      <tr><td>청약홈 주택형별 상세</td><td>주택형, 분양가(최고액, 만원), 공급면적, 일반/특별공급 세대수</td><td class="m">JSON</td><td>매일</td></tr>
+      <tr><td>청약홈 경쟁률</td><td>순위, 해당/기타지역, 접수건수, 경쟁률</td><td class="m">JSON</td><td>매일</td></tr>
+      <tr><td>청약홈 무순위 공고·주택형</td><td>무순위·잔여세대 공고와 주택형. 과거 공고까지 전부 돌려줌.</td><td class="m">JSON</td><td>매일</td></tr>
+      <tr><td>국토부 아파트 매매 실거래가</td><td>단지명, 법정동, 전용면적, 거래금액, 거래일, 층, 건축년도, 해제 여부, 토지임대부 여부</td><td class="m">XML</td><td>매일</td></tr>
+      <tr><td>HUG 민간아파트 분양가격 동향</td><td>시도별·면적대별 ㎡당 분양가(천원)</td><td class="m">CSV 파일</td><td>월 1회</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>활용신청 순서</h3>
+  <ol class="steps">
+    <li><b>data.go.kr 가입.</b> 무료입니다.</li>
+    <li><b>세 API에 활용신청.</b> 청약홈 분양정보 조회 서비스(데이터셋 15098547), 청약홈 청약접수 경쟁률 및 특별공급 신청현황(15098905), 국토교통부 아파트 매매 실거래가 자료(15126469). 개발계정은 자동승인으로 기록돼 있고, 대개 즉시~2시간 안에 승인됩니다.</li>
+    <li><b>승인 전 호출 주의.</b> 승인이 덜 됐을 때 부르면 HTTP 401/500과 <code>SERVICE_KEY_IS_NOT_REGISTERED_ERROR</code>가 옵니다. 고장이 아니니 1~2시간 뒤 다시 해 봅니다.</li>
+    <li><b>HUG 분양가는 신청이 필요 없습니다.</b> API가 아니라 CSV 파일데이터(15061057)이고 인증키도 필요 없습니다.</li>
+    <li><b>미분양은 별도.</b> 한국부동산원 R-ONE에서 따로 키를 받아야 합니다. 이 시스템은 아직 키가 없어 미분양을 모으지 않습니다.</li>
+  </ol>
+
+  <details>
+    <summary>개발자용 — 엔드포인트와 인증</summary>
+    <div class="dbody">
+      <div class="scroll"><table>
+        <thead><tr><th>소스</th><th>엔드포인트</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>공고</td><td class="m">GET https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail</td><td>2026-09-13 기준 2,875건, 필드 49개</td></tr>
+          <tr><td>주택형</td><td class="m">GET …/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancMdl</td><td>14,713건. 공고 1건에 여러 행</td></tr>
+          <tr><td>경쟁률</td><td class="m">GET https://api.odcloud.kr/api/ApplyhomeInfoCmpetRtSvc/v1/getAPTLttotPblancCmpet</td><td>2026-09-13 전체 54,694행</td></tr>
+          <tr><td>무순위 공고</td><td class="m">GET …/ApplyhomeInfoDetailSvc/v1/getRemndrLttotPblancDetail</td><td>2026-10-20 기준 1,718건</td></tr>
+          <tr><td>무순위 주택형</td><td class="m">GET …/ApplyhomeInfoDetailSvc/v1/getRemndrLttotPblancMdl</td><td>4,779행</td></tr>
+          <tr><td>실거래가</td><td class="m">GET http://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade</td><td>https가 아니라 http. <code>LAWD_CD</code>(시군구 5자리), <code>DEAL_YMD</code>(YYYYMM)</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li>청약홈 계열 응답 모양은 <code>{currentCount, totalCount, data:[...]}</code>입니다. 실거래가만 XML(<code>&lt;response&gt;&lt;header&gt;…&lt;body&gt;&lt;items&gt;&lt;item&gt;</code>)입니다.</li>
+        <li>인증은 쿼리 파라미터 <code>serviceKey</code> 하나입니다. 키는 환경변수에서 먼저 찾고, 없으면 저장소 루트의 <code>.env</code>에서 읽고, 둘 다 없으면 바로 실패합니다. <code>.env</code>와 개인 프로필 파일은 <code>.gitignore</code>로 커밋에서 뺍니다.</li>
+        <li><code>.env</code>에는 <b>디코딩된 일반 인증키</b>를 넣습니다. 코드가 파라미터를 <code>urlencode</code>로 다시 인코딩하기 때문입니다. 포털이 주는 Encoding 키를 넣으면 이중 인코딩될 것으로 보입니다(코드 동작에서 나온 추론).</li>
+        <li>페이징: 청약홈은 <code>perPage=100</code>으로 <code>page</code>를 1부터 올리다가 빈 페이지가 오면 멈춥니다. 실거래가는 <code>numOfRows=1000</code>으로 (시군구, 월)마다 빈 페이지까지 갑니다. perPage 최대값과 트래픽 한도는 확인하지 못했습니다.</li>
+        <li>HUG 다운로드 버튼은 정적 링크가 아닙니다. JS가 ① 이번 달 파일 ID 조회 ② 캡차 필요 여부 확인 ③ 다운로드의 3단계를 밟습니다. 이 흐름을 그대로 재현해 2026-09-13에 CSV 11,050행을 받았습니다.</li>
+        <li>조인: 공고와 주택형은 <code>HOUSE_MANAGE_NO</code>로 붙습니다. 공고 자체의 키는 <code>PBLANC_NO</code>입니다.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<!-- 4 -->
+<section id="pitfalls">
+  <h2>공공 API에서 실제로 밟은 함정</h2>
+  <p>공공 API는 문서와 실제 응답이 자주 다릅니다. 아래는 실제로 겪었거나 실데이터에서 발견한 것들 가운데, 비개발자도 알아 두면 좋은 7개입니다. 나머지는 접어 두었습니다. 대부분 에러 없이 <b>조용히 틀린 숫자</b>를 만든다는 점이 무섭습니다.</p>
+  <div class="pits">
+    <div class="pit"><h3>공급면적과 전용면적</h3>
+      <p><b>생긴 일</b> 청약홈은 공급면적, 실거래가는 전용면적을 줍니다. 공급면적이 전용보다 1.43~1.49배 커서, 그대로 비교하면 분양가가 30~40% 싸 보이고 안전마진이 가짜로 부풉니다.</p>
+      <p><b>막은 법</b> 전용면적을 주택형 이름(예: "055.9700A" → 55.97㎡)에서 따로 뽑습니다. 모양이 다르면 짐작하지 않고 비교에서 뺍니다.</p></div>
+    <div class="pit"><h3>같은 이름의 구</h3>
+      <p><b>생긴 일</b> "중구"는 서울·부산·대구·인천에 다 있습니다. 이름만 보면 부산 공고가 서울로 붙습니다. "광주시"는 경기 광주시와 광주광역시가 같은 글자이고, "남양주시" 안에는 "양주시"가 들어 있습니다.</p>
+      <p><b>막은 법</b> 시·도가 먼저 맞아야 인정합니다. 이름 일부만 겹치는 경우는 버립니다.</p></div>
+    <div class="pit"><h3>최근 두 달 착시</h3>
+      <p><b>생긴 일</b> 실거래는 계약 후 30일 안에 신고합니다. 2026-09-13 시점에 4월 거래는 15,037건인데 9월은 1,606건이었습니다. 거래가 준 게 아니라 신고가 덜 끝난 것입니다.</p>
+      <p><b>막은 법</b> 비교 기간을 "이번 달의 두 달 전"에서 끝냅니다. 모자란 표본은 기간을 늘려 메웁니다.</p></div>
+    <div class="pit"><h3>빈 값을 0으로</h3>
+      <p><b>생긴 일</b> 빈칸이나 "-"를 0으로 바꾸면 "값 없음"과 "0"이 구분되지 않습니다. 경쟁률 0 같은 거짓 정보가 생깁니다.</p>
+      <p><b>막은 법</b> 빈 값은 빈칸(값 없음)으로 둡니다. 모르는 값이 와도 그 칸만 비우고 전체 수집은 계속합니다.</p></div>
+    <div class="pit"><h3>0건을 성공으로</h3>
+      <p><b>생긴 일</b> 인증키 미적용, 주소 변경, 사용량 초과가 모두 에러 없이 "0건"으로 나타납니다. 에러 화면을 정상 응답처럼 주기도 합니다.</p>
+      <p><b>막은 법</b> 0건은 "비었음"으로 분류해 실패와 같게 취급합니다. 단 거래 없는 달은 정상이라, 일부 지역 0건과 전체 0건을 구분합니다.</p></div>
+    <div class="pit"><h3>임대 공고 섞임</h3>
+      <p><b>생긴 일</b> 행복주택·국민임대 공고 149건이 보증금을 분양가 칸에 담은 채 섞여 있었습니다.</p>
+      <p><b>막은 법</b> 분양/임대 구분을 저장하고, 임대는 판정과 안전마진에서 뺍니다.</p></div>
+    <div class="pit"><h3>해제 거래·토지임대부</h3>
+      <p><b>생긴 일</b> 계약이 해제된 거래(표본의 2.07%)와 땅값이 빠진 토지임대부 거래가 시세 비교에 섞였습니다.</p>
+      <p><b>막은 법</b> 두 정보를 저장하고 비교에서 뺍니다.</p></div>
+  </div>
+  <details>
+    <summary>개발자용 — 함정 전체 목록 (나머지 15개)</summary>
+    <div class="dbody">
+      <p class="hint">표는 옆으로 밀어서 보세요 →</p>
+      <div class="scroll"><table>
+        <thead><tr><th>함정</th><th>무슨 일이 생겼나</th><th>어떻게 막았나</th></tr></thead>
+        <tbody>
+        <tr><td>청약홈을 XML로 가정</td><td>처음 계획은 XML이라고 봤는데 실제로는 JSON이었다.</td><td>엔드포인트마다 실응답을 먼저 한 번 받아 형식을 확정한다. JSON 파서를 따로 둔다.</td></tr>
+        <tr><td>지역 코드 자릿수</td><td><code>SUBSCRPT_AREA_CODE</code>는 시도 3자리(100=서울, 410=경기)다. 시군구 5자리와 비교하면 모든 공고가 "해당지역 아님"이 되어 1순위 목록이 영구히 빈다.</td><td>시도 코드는 시도용으로만 저장. 시군구는 주소 문자열을 파싱해서 얻는다.</td></tr>
+        <tr><td>부천시 코드</td><td>"부천시" 단독 코드로 실거래가를 부르면 0건이 온다.</td><td>원칙적으로 실제 API로 검증한 코드만 표에 싣는다. 부천은 옛 3구 코드로 넣되, 실제로 확인한 것은 소사구 하나이고 나머지 둘은 미검증으로 표시해 두었다.</td></tr>
+        <tr><td>숫자가 문자열로 옴</td><td>같은 API 안에서도 어떤 필드는 문자열, 어떤 필드는 숫자로 온다.</td><td>변환 함수가 둘 다 받게 한다.</td></tr>
+        <tr><td>천단위 쉼표</td><td>"7,474.67" 같은 경쟁률 14건이 파싱 실패로 빠졌다. 하필 가장 치열한 상위 값들(최대 35,076대)이었다.</td><td>형변환 전에 쉼표를 뺀다. 고친 뒤 54,694행 전체를 다시 받아 실패 0건을 확인했다.</td></tr>
+        <tr><td>경쟁률 칸의 정체</td><td>라이브 첫 페이지에서 <code>'(△6)'</code> 때문에 죽었다. 실측 모양은 숫자 21.66%, 미달 "(△N)" 30.57%, "-" 47.75%, null 0.02%. 문서엔 없다.</td><td>원문은 항상 보존. 숫자는 경쟁률 칸, 미달 N은 미달 세대수 칸에 따로 넣는다. 전부 못 읽으면 "의심" 상태로 표시한다.</td></tr>
+        <tr><td>Y/N을 참거짓으로</td><td>규제지역 플래그가 "Y"/"N" 문자로 온다. 파이썬에서 <code>bool("N")</code>은 참이다. 그대로 두면 비규제 공고가 전부 규제지역이 된다. 에러도 안 난다.</td><td>허용 값을 명시해 1/0으로 바꾸고, 모르는 값이면 바로 멈춘다.</td></tr>
+        <tr><td>경쟁률 키 누락</td><td>해당지역과 기타지역 경쟁률이 따로 온다. 키에 거주구분이 없으면 한쪽이 다른 쪽을 덮어써 데이터 절반이 사라진다.</td><td>키에 거주구분을 넣는다.</td></tr>
+        <tr><td>실거래에 ID가 없음</td><td>같은 단지에서 같은 날 같은 층·면적·가격으로 두 세대가 팔리면 구분이 안 된다.</td><td>(시군구, 월) 묶음째 지우고 다시 넣는다. 묶음마다 트랜잭션을 끝낸다.</td></tr>
+        <tr><td>수집 기간이 비교 창보다 짧음</td><td>실거래를 6개월치만 모으면서 12개월 비교 창을 만들었다. 646번 계산에서 12개월 창이 한 번도 의미가 없었다.</td><td>수집을 12개월로 올렸다. 조회 창은 항상 실제로 모은 기간 안에 둔다.</td></tr>
+        <tr><td>무순위 첫 적재 폭탄</td><td>무순위 API는 과거 공고 1,700여 건을 한꺼번에 준다. 최초 발견일만으로 "신규"를 가리면 첫날 대량 알림이 나갈 수 있다(설계 단계에서 짚은 위험).</td><td>한 번에 신규가 5건을 넘으면 요약 1건만 보낸다. 최초 발견일은 재수집 때 덮어쓰지 않는다.</td></tr>
+        <tr><td>꼬리 공백</td><td>주택형 "048.8190 "처럼 끝에 공백이 붙어 온다. 같은 주택형이 두 행으로 갈라질 수 있다.</td><td>모든 문자열을 다듬고, 빈 문자열은 NULL로.</td></tr>
+        <tr><td>HUG 파일명 변경·캡차</td><td>첨부파일명이 매달 바뀐다. URL을 고정하면 다음 달 깨진다. 다운로드가 잦으면 캡차가 뜬다.</td><td>데이터셋 고정 ID로 그달 파일을 먼저 찾는다. 캡차가 뜨면 빈 파일로 넘어가지 않고 사람이 할 일을 적어 실패시킨다.</td></tr>
+        <tr><td>오늘을 UTC로</td><td>서버 시계가 UTC면 한국 시간 00:00~08:59에 돌릴 때 어제가 오늘이 된다.</td><td>날짜 판단은 모두 한국 시간으로 바꿔서 한다.</td></tr>
+        <tr><td>조정대상 과열/위축</td><td>청약홈 API는 조정대상지역이 과열인지 위축인지 알려주지 않는다.</td><td>데이터로는 못 푼다. 더 엄격한 쪽(과열)으로 판정하고 알려진 공백으로 적어 둔다.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </details>
+  <details>
+    <summary>개발자용 — 재시도와 페이지 상한</summary>
+    <div class="dbody">
+      <ul>
+        <li>4xx는 429만 빼고 바로 실패시킵니다(인증·파라미터 오류는 재시도해도 안 됩니다). 네트워크 오류·5xx·429만 지수 백오프 1초, 2초로 최대 3회 시도합니다.</li>
+        <li>실거래가는 지역 단위로 실패를 격리합니다. 처음부터 3개 지역이 연달아 실패하면 전면 장애로 보고 멈춥니다.</li>
+        <li>아직 막지 못한 것: 수집기는 페이지 상한까지 돌면 그냥 끝나고 <code>totalCount</code>와 비교하지 않습니다. 경쟁률 상한은 60,000행인데 2026-09-13 실측이 54,694행이라 여유가 10%가 채 안 됩니다(2026-09-13 기준). 첫 페이지의 <code>totalCount</code>와 누적 행 수를 비교하는 것을 권합니다(미구현).</li>
+        <li>실거래가 XML의 <code>resultCode</code>(정상 "000")는 검사하지 않습니다. 에러 XML은 item이 없어 0건으로 잡힙니다.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<!-- 5 -->
+<section id="eligibility">
+  <h2>청약 자격을 어떻게 가리나</h2>
+  <p>내 조건을 적은 설정 파일 하나와 공고 정보를 맞대어 다섯 가지 중 하나로 판정합니다. 판정마다 왜 그렇게 나왔는지 이유 문장이 반드시 붙습니다.</p>
+
+  <div class="scroll"><table>
+    <thead><tr><th>결과</th><th>뜻</th><th>어디에 보이나</th></tr></thead>
+    <tbody>
+      <tr><td>1순위</td><td>요건 충족, 해당지역 거주. 이 시스템은 거주 시군구 코드가 공고와 같을 때만 해당지역으로 봅니다(단순화, 아래 주의 참고)</td><td>알림·노트 상단</td></tr>
+      <tr><td>1순위(기타지역)</td><td>요건 충족, 이 시스템 기준으로 다른 시군구 거주. 자격 미달이 아니라 접수 순서가 뒤</td><td>알림·노트 상단</td></tr>
+      <tr><td>2순위</td><td>통장·세대주·예치금 중 하나가 모자람. 순서만 밀릴 뿐 신청 가능</td><td>노트(임박하면 맨 위)</td></tr>
+      <tr><td>판정보류</td><td>공고 시군구를 확정하지 못함</td><td>노트 참고 표</td></tr>
+      <tr><td>자격없음</td><td>내가 신청할 수 없다고 설정에 적어 둔 공급유형</td><td>노트 참고 표만, 알림 없음</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>판정 순서</h3>
+  <ol class="steps">
+    <li><b>공급유형</b>이 설정의 "신청 불가 유형" 목록에 있으면 바로 자격없음.</li>
+    <li><b>공고 시군구</b>를 모르면 판정보류.</li>
+    <li><b>통장 가입기간</b>이 모자라면 2순위. 비규제지역은 수도권 12개월, 그 밖 6개월. 규제지역은 24개월.</li>
+    <li><b>규제지역인데 세대주가 아니면</b> 2순위.</li>
+    <li><b>민영주택인데 예치금</b>이 공고 안 가장 큰 주택형 기준에 모자라면 2순위.</li>
+    <li>모두 통과하면 <b>거주지</b>로 1순위 / 1순위(기타지역)를 가릅니다. 지금은 거주 시군구 코드와 공고 시군구 코드가 같은지만 봅니다.</li>
+  </ol>
+
+  <div class="note amber"><p><b>해당지역 범위는 단순화했습니다.</b> 실제 "해당 주택건설지역"은 일반적으로 시·군 단위(특별시·광역시는 시 전체)로 알려져 있습니다(법령 원문 미대조). 예를 들어 서울 공고라면 서울의 다른 구에 살아도 해당지역일 수 있는데, 이 시스템은 그 경우를 "1순위(기타지역)"로 표시합니다. 최종 범위는 모집공고문이 정합니다.</p></div>
+
+  <p class="cap">민영 1순위 예치금 (면적별, 만원)</p>
+  <div class="scroll"><table class="compact">
+    <thead><tr><th>지역</th><th class="m">~85㎡</th><th class="m">~102㎡</th><th class="m">~135㎡</th><th class="m">초과</th></tr></thead>
+    <tbody>
+      <tr><td>서울·부산</td><td class="m">300</td><td class="m">600</td><td class="m">1,000</td><td class="m">1,500</td></tr>
+      <tr><td>기타 광역시</td><td class="m">250</td><td class="m">400</td><td class="m">700</td><td class="m">1,000</td></tr>
+      <tr><td>그 밖 지역</td><td class="m">200</td><td class="m">300</td><td class="m">400</td><td class="m">500</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note amber">
+    <p><b>근거 수준을 솔직히 적습니다.</b> 위 숫자(통장 12/6/24개월, 규제지역 세대주 요건, 예치금 표)는 「주택공급에 관한 규칙」을 해설한 부동산 정보 사이트·기사로 교차 확인한 <b>2차 출처</b>이고, 마지막 확인일은 2026-09-13입니다. 법령 원문의 조문 번호와는 아직 대조하지 않았습니다. 코드도 이 값들 옆에 "미검증"이라고 적어 두었습니다.</p>
+    <p>저장소 코드 주석에 조문 번호까지 적혀 있는 것은 하나입니다(주석을 옮긴 것이며 법령 원문과 대조하지는 않았습니다). 무순위 공급은 「주택공급에 관한 규칙」 제19조 제5항이 2025-06-10 개정되어 무주택세대구성원 요건이 생겼습니다. 지자체가 거주 요건을 더할 수 있습니다.</p>
+  </div>
+
+  <div class="note">
+    <p><b>접수 자격이지 당첨 가능성이 아닙니다.</b> 가점(무주택기간·부양가족·통장 기간), 특별공급, 납입횟수, 과거 당첨 이력, 주택 소유 여부는 판정에 들어가지 않습니다. "1순위"가 떠도 그 공고의 모집공고문을 반드시 직접 확인하세요.</p>
+  </div>
+
+  <h3>제도상 따로 챙길 것</h3>
+  <p class="sub">이 시스템이 자동으로 가리지 않는 일반 제도입니다. 개인 사정에 대입하지 말고 공고문과 법령 원문으로 확인하세요.</p>
+  <ul class="limits">
+    <li><b>규제지역 1순위는 세대주 요건이 붙습니다.</b> 투기과열지구·조정대상지역에서는 세대원이면 1순위가 될 수 없다고 봅니다(위 2차 출처 기준). 조정대상지역 중 위축지역은 통장 요건이 다르지만 API가 구분해 주지 않아 반영하지 못했습니다.</li>
+    <li><b>국민주택(공공)은 유형에 따라 소득·자산 기준이 붙을 수 있습니다.</b> 무주택세대구성원 요건, 납입횟수 같은 별도 기준도 있습니다. 이 시스템은 이것을 계산하지 않고, 이 가이드도 해당 기준을 검증하지 않았습니다. 공고문을 보세요.</li>
+  </ul>
+
+  <details>
+    <summary>개발자용 — 규칙을 코드 한 곳에 모으기</summary>
+    <div class="dbody">
+      <p>제도가 바뀌면 이 블록만 고치게 했습니다. 매 실행마다 전체 공고를 다시 판정하므로, 규칙을 고치면 과거 공고 판정도 다음 날 바로 바뀝니다.</p>
+<pre><code>RULES = {
+    "normal_min_account_months": {"capital": 12, "other": 6},  # 수도권/비수도권 (2차 출처, 미검증)
+    "regulated_min_account_months": 24,                        # 투기과열/조정대상 (2차 출처, 미검증)
+    "regulated_requires_household_head": True,                  # 규제지역 1순위는 세대주 (2차 출처, 미검증)
+}
+_CAPITAL_SIDO = {"서울", "경기", "인천"}</code></pre>
+      <p class="cap">판정 뼈대 (의사코드 — 실제 코드는 이유 문장을 함께 돌려준다)</p>
+<pre><code>if supply_type in (profile.get("ineligible_supply_types") or []): return "자격없음"
+if notice["sigungu_code"] is None:                 return "판정보류"
+if account_months &lt; required_months(regulated, sido): return "2순위"   # 가입기간
+if regulated and not is_household_head:            return "2순위"   # 세대주
+if supply_type == "민영" and deposit &lt; required:     return "2순위"   # 예치금(최대 주택형 기준)
+return "1순위" if resident_sigungu == sigungu_code else "1순위(기타지역)"</code></pre>
+      <ul>
+        <li>규제지역 여부는 <code>SPECLT_RDN_EARTH_AT</code>(투기과열) OR <code>MDAT_TRGET_AREA_SECD</code>(조정대상)입니다.</li>
+        <li>인천은 통장 기간에서는 수도권, 예치금 표에서는 기타 광역시로 분류됩니다. 두 표가 서로 다른 지역 묶음을 씁니다.</li>
+        <li>"1순위"와 "1순위(기타지역)"를 함께 뜻하는 상수를 한 곳에 두고 노트와 알림이 같이 씁니다. 예전엔 <code>rank == "1순위"</code> 비교가 흩어져 있어서 기타지역 1순위에 알림이 안 가는 회귀가 있었습니다.</li>
+        <li>과거에 거주기간을 순위 조건으로 썼다가 지웠습니다. 거주기간은 해당지역 우선공급의 기준이고 기간은 공고마다 승인권자가 정합니다.</li>
+        <li>개인 설정 파일은 커밋하지 않습니다. 파일이 없으면 예제 설정으로 조용히 대체하지 않고 실패합니다. 남의 조건으로 계산한 "1순위"가 멀쩡해 보이는 것이 더 위험하기 때문입니다.</li>
+        <li>무순위는 API에 민영/국민·규제 구분이 없어 이 판정을 아예 거치지 않고, 공고문 확인을 안내합니다.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<!-- 6 -->
+<section id="margin">
+  <h2>안전마진 계산</h2>
+  <p>"분양가가 주변 시세보다 얼마나 싼가"를 한 숫자로 냅니다. 주변 시세는 평균이 아니라 <b>싼 쪽 4분의 1 지점(P25)</b>을 씁니다. 일부러 낮게 잡은 기준선이라 숫자가 보수적으로 나옵니다.</p>
+<pre style="white-space:pre-wrap"><code>안전마진 = 1 − (분양가 ÷ 전용면적) ÷ P25(주변 실거래 금액 ÷ 전용면적)</code></pre>
+  <p>+면 분양가가 주변 싼 거래들보다도 싸다는 뜻이고, −면 그만큼 비싸다는 뜻입니다. −40%면 분양가가 그 P25 가격의 1.4배입니다.</p>
+
+  <h3>주변을 어떻게 고르나</h3>
+  <p>같은 시군구, 전용면적 ±10%, 해제 거래와 토지임대부 거래는 뺍니다. 그다음 좁은 범위부터 시도하고, 거래가 5건 미만이면 한 단계 넓힙니다.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>단계</th><th>범위</th><th>기간</th><th>연식</th><th>표시</th></tr></thead>
+    <tbody>
+      <tr><td>동 기준</td><td>같은 법정동</td><td class="m">8개월</td><td>건축 10년 이내</td><td>숫자 표시</td></tr>
+      <tr><td>구 기준</td><td>같은 시군구</td><td class="m">8개월</td><td>건축 10년 이내</td><td>숫자 표시</td></tr>
+      <tr><td>연식 무관</td><td>같은 시군구</td><td class="m">8개월</td><td>무관</td><td>"비교군 부적합" (숫자 숨김)</td></tr>
+      <tr><td>기간 확대</td><td>같은 시군구</td><td class="m">12개월</td><td>무관</td><td>"비교군 부적합" (숫자 숨김)</td></tr>
+      <tr><td>전부 미달</td><td>—</td><td>—</td><td>—</td><td>"표본부족" (숫자를 지어내지 않음)</td></tr>
+    </tbody>
+  </table></div>
+  <p>기간은 항상 "이번 달의 두 달 전"에서 끝납니다. 최근 두 달은 신고가 덜 차서입니다.</p>
+  <p>동 단계를 맨 앞에 둔 이유가 있습니다. 같은 구 안에서도 동네마다 시세가 크게 갈립니다. 예로 분당의 한 단지는 구 전체 P25가 대장동 거래 99건에 눌려 ㎡당 1,441만원이었는데, 정자동만 보면 약 2,036만원이었습니다. 그래서 공개 페이지에는 동 기준과 구 기준 두 숫자를 같이 보여주고, 순위는 구 기준으로 매깁니다.</p>
+
+  <div class="note">
+    <p><b>참고 지표이지 판정이 아닙니다.</b> "좋음/나쁨" 같은 등급을 붙이지 않습니다. 모든 노트에 세 가지 한계를 고정으로 적습니다.</p>
+    <p>① 발코니 확장·옵션비가 빠져 있어 마진이 실제보다 크게 나옵니다. ② 분양가는 2~3년 뒤 입주 가격이라 지금 실거래와 시점이 다릅니다. ③ 신축과 기존 단지는 연식이 다릅니다.</p>
+  </div>
+  <p>2026-09-13 당시 공개 페이지 기준으로, 마진이 계산된 93개 주택형 중 85개가 −였고 중앙값은 −31%였습니다. 이유는 세 가지입니다. P25가 일부러 낮게 잡은 기준선이고, 열린 공고가 주로 수도권 외곽·지방 택지였으며, 구 단위로 묶어 비교하는 데 한계가 있습니다(위 분당 예처럼). −는 "비싸다"는 판정이 아니라 "이 구의 싼 거래들과 거리가 멀다"로 읽어야 합니다.</p>
+
+  <details>
+    <summary>개발자용 — P25와 실패 처리</summary>
+    <div class="dbody">
+<pre><code>import math
+def p25(values):                       # 보간 없는 nearest-rank
+    v = sorted(values)
+    return v[math.ceil(len(v) * 0.25) - 1]</code></pre>
+      <ul>
+        <li>선형보간 P25는 표본 4~15건 수준에서 존재하지 않는 값을 만들고, 그 값이 항상 더 높아 마진이 낙관적으로 나옵니다. 테스트로 고정했습니다(보간이면 0.5111, nearest-rank면 0.5).</li>
+        <li>보수성은 P25 하나로만 넣습니다. 1.05/0.95 같은 임의 보정 계수를 쓰지 못하게 하는 테스트가 있습니다.</li>
+        <li>금액이 NULL인 행은 정렬에서 TypeError를, 전부 0원인 표본은 0으로 나누기 에러를 냈습니다. SQL에서 NULL·0 이하를 걸러내고 파이썬에서 한 번 더 거릅니다. 통과한 값만 표본 수에 셉니다.</li>
+        <li>마진 값 자체가 없으면 "표본부족"으로 표시하지 않고 에러로 실패합니다. "표본부족"은 "봤는데 모자랐다"이지 "아무도 안 봤다"가 아니기 때문입니다.</li>
+        <li>분양가는 주택형별 최고액을 씁니다. 그래서 마진이 더 적게, 보수적으로 나옵니다.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<!-- 7 -->
+<section id="ops">
+  <h2>매일 돌리는 법</h2>
+  <p>서버에서 하루 한 번 오전 11시(한국 시간)에 자동으로 돕니다. HUG 분양가는 매월 5일에 돕니다. 1일에는 직전 달 데이터가 아직 안 나와 있어서입니다. 그 대신 월간 숫자는 실행 시점보다 두 달 전 기준입니다.</p>
+
+  <h3>배치 순서</h3>
+  <ol class="steps">
+    <li><b>수집.</b> 6개 소스를 하나씩 받습니다(공고, 주택형, 경쟁률, 실거래, 무순위 공고, 무순위 주택형).</li>
+    <li><b>상태 판단.</b> 하나라도 에러·0건·의심이면 "오래된 데이터" 표시를 켭니다.</li>
+    <li><b>자격 재판정.</b> 전체 공고를 다시 판정합니다.</li>
+    <li><b>레이더 행 만들기.</b> 공고 × 주택형, 무순위 따로.</li>
+    <li><b>노트 쓰기·커밋.</b> 레이더 노트 한 장을 덮어쓰고 그 파일만 커밋합니다.</li>
+    <li><b>알림.</b> 일반 공고, 그다음 무순위.</li>
+  </ol>
+
+  <h3>조용히 실패하지 않기</h3>
+  <ul class="limits">
+    <li><b>소스별 격리.</b> 하나가 죽어도 나머지는 돕니다. 실행마다 소스별 결과(건수, 상태, 에러)를 기록합니다.</li>
+    <li><b>0건은 경고.</b> 정상이 아니라 "비었음"으로 분류합니다.</li>
+    <li><b>오래된 데이터 표시.</b> 수집이 실패하면 기존 노트를 지우지 않고 맨 위에 "수집 실패로 이전 데이터를 보여주는 중" 경고를 붙입니다. 갱신 시각도 이전 값을 유지해, 장애가 일주일 가도 "방금 갱신됨"이라고 주장하지 않게 합니다.</li>
+    <li><b>겹쳐 돌지 않기.</b> 이미 돌고 있으면 기다리지 않고 이번 회차를 건너뜁니다.</li>
+  </ul>
+
+  <h3>알림 스팸 막기</h3>
+  <p>알림이 잦으면 무시하게 되고, 무시하기 시작하면 접수일을 놓칩니다. 그래서 알림은 네 종류로 좁혔습니다.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>알림</th><th>언제</th><th>스팸 방지</th></tr></thead>
+    <tbody>
+      <tr><td>[D-3]</td><td>1순위 공고의 1순위 해당지역 접수일까지 정확히 3일 남은 날</td><td>"3일 이하"가 아니라 "정확히 3일". 공고 하나당 한 통(주택형은 한 메시지에 나열). 마감 공고 제외</td></tr>
+      <tr><td>[신규]</td><td>1순위 공고를 오늘 처음 발견</td><td>최초 발견일을 재수집 때 덮어쓰지 않음</td></tr>
+      <tr><td>[무순위 접수일]</td><td>무순위 접수 시작일이 오늘</td><td>같은 공고가 신규이기도 하면 이 알림 하나로</td></tr>
+      <tr><td>[무순위 신규]</td><td>관심 지역 무순위를 오늘 처음 발견</td><td>5건을 넘으면 요약 1건</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>공개 페이지 발행</h3>
+  <p>공개 페이지 두 장은 만들고 → 검사하고 → 쓰고 → 올리는 순서로 발행합니다. 검사에서 하나라도 걸리면 쓰지도 올리지도 않습니다. 예전에 손으로 짠 HTML이 구조가 깨진 채 올라간 일이 있었기 때문입니다. 올린 뒤에는 실제 배포된 페이지를 다시 받아 카드 수가 맞는지 확인합니다. "커밋은 됐는데 배포본은 옛날 것"을 잡기 위해서입니다.</p>
+  <div class="note amber"><p><b>공개 페이지는 수동 발행입니다. 마지막 발행은 2026-10-21입니다.</b> 발행 뒤에 마감된 공고가 "열린 청약"에 남아 있을 수 있습니다. 페이지 상단의 기준일을 꼭 확인하세요.</p></div>
+
+  <details>
+    <summary>개발자용 — 진입점, 실패 격리, 마이그레이션, 테스트</summary>
+    <div class="dbody">
+      <p class="cap">cron 진입점 (경로는 자리표시자)</p>
+<pre><code>#!/bin/bash
+set -euo pipefail
+cd "$REPO_DIR"
+# -n: 이미 실행 중이면 기다리지 않고 이번 회차를 건너뛴다
+exec flock -n /tmp/daily.lock python3 -m bin.daily</code></pre>
+      <p class="cap">소스별 실패 격리</p>
+<pre><code>def _collect_all(conn, today):
+    collected = {}
+    for name, fn in COLLECTORS:
+        try:
+            res = fn(conn, today)
+            collected[name] = {"status": res.status, "rows": res.rows, "error": res.error}
+        except Exception as e:  # 의도적으로 광범위: 격리가 목적
+            logger.warning(f"_collect_all failed for {name}: {e}")
+            collected[name] = {"status": "error", "rows": 0, "error": str(e)}
+    return collected
+
+_FAILURE_STATUSES = {"error", "empty", "suspicious"}
+stale = any(c["status"] in _FAILURE_STATUSES for c in collected.values())</code></pre>
+      <p class="cap">'신규' 판정용 최초 발견일 보존</p>
+<pre><code>INSERT INTO notice (..., first_seen_at, fetched_at) VALUES (..., ?, ?)
+ON CONFLICT(notice_no) DO UPDATE SET
+  ...,
+  first_seen_at = COALESCE(notice.first_seen_at, excluded.first_seen_at),
+  fetched_at = excluded.fetched_at</code></pre>
+      <p class="cap">PRAGMA user_version 순차 마이그레이션</p>
+<pre><code>version = conn.execute("PRAGMA user_version").fetchone()[0]
+if version &gt; SCHEMA_VERSION:
+    raise RuntimeError("DB가 코드보다 새 버전이다 — 코드 업데이트 필요")
+if version == 0:
+    conn.executescript(SCHEMA)
+    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+    conn.commit(); return
+for target, sql in MIGRATIONS:          # [(2, DDL), (3, DDL), ... (8, DDL)]
+    if version &lt; target &lt;= SCHEMA_VERSION:
+        conn.executescript(sql)
+        conn.execute(f"PRAGMA user_version = {target}")
+        version = target
+conn.commit()</code></pre>
+      <ul>
+        <li>마이그레이션을 둔 이유: <code>CREATE TABLE IF NOT EXISTS</code>만으로는 기존 DB에 새 칼럼이 조용히 안 생기고, 그 칼럼에 쓰는 INSERT가 계속 실패합니다. 키를 바꿀 땐 새 테이블 생성 → 복사 → 옛 테이블 삭제 → 이름 변경 순서로 합니다. 현재 스키마 버전은 8입니다.</li>
+        <li>노트 커밋은 이 시스템이 쓴 파일만 <code>git add --</code>로 올립니다. <code>git add -A</code>는 이 시스템이 쓰지 않은 파일까지 함께 올릴 수 있어 금지했습니다.</li>
+        <li>노트 쓰기는 짧게 락을 재시도하다 60초를 넘기면 에러로 죽습니다. 무한정 기다리며 멈춰 있는 것보다 낫습니다.</li>
+        <li>텔레그램은 4,000자 단위로 줄을 나눠 보내고, 실패하면 1초 뒤 한 번 더 시도합니다. 토큰이 없으면 에러 없이 "자격증명 없음"을 돌려줍니다.</li>
+        <li>테스트: 파싱 테스트는 실응답을 저장한 픽스처로 오프라인에서 돕니다. 라이브 호출은 정찰과 전수 검증 때만 했습니다. 픽스처를 저장하기 전에 키 문자열이 들어 있지 않은지 확인하기를 권합니다. 레이더 노트는 골든 파일과 비교합니다. 모든 테스트에서 노트 저장소와 락 경로를 임시 폴더로 강제해 실제 노트를 건드리지 않게 했습니다.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<!-- 8 -->
+<section id="diy">
+  <h2>직접 만들어 보려면</h2>
+  <p>제일 중요한 순서는 하나입니다. <b>실제 응답을 먼저 받아 보고, 그다음에 표를 설계한다.</b> 상상으로 짠 표는 거의 다 바뀝니다. 이 시스템도 새벽에 짠 표를 같은 날 오전 실응답을 보고 통째로 갈아엎었습니다.</p>
+  <ol class="steps">
+    <li><b>키 받기.</b> data.go.kr 가입 후 청약홈 분양정보(15098547), 경쟁률(15098905), 아파트 매매 실거래가(15126469)에 활용신청.</li>
+    <li><b>키 숨기기.</b> 디코딩된 일반 인증키를 <code>.env</code>에 넣고 <code>.gitignore</code>에 <code>.env</code>를 추가.</li>
+    <li><b>실응답 1페이지 저장.</b> 엔드포인트마다 한 번 불러 파일로 저장. 이게 테스트 픽스처가 됩니다. 저장 전에 키 문자열이 없는지 확인.</li>
+    <li><b>필드 확정.</b> 형식(JSON/XML), 숫자가 문자열인지, 빈 값 모양, 지역 코드 자릿수, 면적이 공급인지 전용인지를 실응답에서 확인.</li>
+    <li><b>표 설계.</b> 공고·주택형·경쟁률·실거래·실행기록. 실행기록 표를 처음부터 둡니다. 스키마 버전도 처음부터.</li>
+    <li><b>정규화 함수부터.</b> 숫자 변환(쉼표, 빈 값 → NULL), Y/N 변환, 전용면적 추출. 픽스처로 테스트.</li>
+    <li><b>수집기.</b> 빈 페이지까지 페이징, 0건은 경고, 소스별 격리.</li>
+    <li><b>내 조건 파일.</b> 거주 시군구 코드, 통장 가입기간, 예치금, 세대주 여부. 커밋 금지. 판정 규칙은 한 곳에 모으고 출처 수준을 같이 적기.</li>
+    <li><b>출력은 한 장부터.</b> 노트 한 장 덮어쓰기로 시작하고, 알림은 D-3·신규 두 개만.</li>
+    <li><b>매일 돌리기.</b> cron에 하루 한 번, 겹침 방지, 날짜는 한국 시간.</li>
+  </ol>
+
+  <details>
+    <summary>개발자용 — 최소 호출 코드와 정규화 함수</summary>
+    <div class="dbody">
+    <p class="cap">청약홈 최소 호출 (JSON)</p>
+<pre><code>import json, urllib.parse, urllib.request
+KEY = "&lt;공공데이터포털_일반인증키(Decoding)&gt;"
+url = "https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail"
+qs = urllib.parse.urlencode({"serviceKey": KEY, "page": 1, "perPage": 100})
+with urllib.request.urlopen(f"{url}?{qs}", timeout=20) as r:
+    body = json.loads(r.read())          # {currentCount, totalCount, data:[...]}
+rows = body.get("data") or []           # 빈 페이지가 나올 때까지 page += 1</code></pre>
+
+    <p class="cap">국토부 실거래가 최소 호출 (XML, 예시는 서울 종로구 11110)</p>
+<pre><code>import urllib.parse, urllib.request, xml.etree.ElementTree as ET
+url = "http://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade"
+qs = urllib.parse.urlencode({"serviceKey": KEY, "LAWD_CD": "11110",
+                             "DEAL_YMD": "202608", "numOfRows": 1000, "pageNo": 1})
+root = ET.fromstring(urllib.request.urlopen(f"{url}?{qs}", timeout=20).read())
+rows = [{c.tag: (c.text or "").strip() for c in it} for it in root.iter("item")]
+# 거래 없는 달은 &lt;items/&gt; + totalCount=0 — 에러 아님</code></pre>
+
+    <p class="cap">숫자 정규화 (문자열·숫자 모두 받고, 빈값은 NULL, 쉼표 제거, 예외 없음)</p>
+<pre><code>def to_float(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        if value in ("", "-"):
+            return None
+        value = value.replace(",", "")   # "7,474.67"
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None</code></pre>
+
+    <p class="cap">Y/N 플래그 (bool("N") == True 함정 방지)</p>
+<pre><code>_YN_TRUTHY = {1, "1", "Y", "y", True}
+_YN_FALSY = {0, "0", "N", "n", "", None, False}
+def normalize_yn(value):
+    if value in _YN_TRUTHY: return True
+    if value in _YN_FALSY: return False
+    raise ValueError(f"인식할 수 없는 Y/N 값: {value!r}")</code></pre>
+    </div>
+  </details>
+  <details>
+    <summary>개발자용 — 스니펫 더 보기 (전용면적, 경쟁률, 실거래 적재, 0건 분류, 관심지역)</summary>
+    <div class="dbody">
+      <p class="cap">전용면적은 공급면적이 아니라 주택형 코드에서</p>
+<pre><code>def exclusive_area_from_house_ty(house_ty):   # "055.9700A" -&gt; 55.97
+    if not house_ty or len(house_ty) &lt; 8:
+        return None
+    try:
+        return float(house_ty[:8])
+    except ValueError:
+        return None                            # 추측하지 않고 비교에서 제외</code></pre>
+      <p class="cap">경쟁률 칸 분해: 숫자 / 미달 '(△N)' / 값없음 / 진짜 실패</p>
+<pre><code>import re
+_SHORTFALL_RE = re.compile(r"^\(△(\d+)\)$")
+def parse_rate(raw):                  # -&gt; (ratio, shortfall, unparsed)
+    ratio = to_float(raw)
+    if ratio is not None: return ratio, None, False
+    text = raw.strip() if isinstance(raw, str) else raw
+    if text in (None, "", "-"): return None, None, False
+    m = _SHORTFALL_RE.match(text) if isinstance(text, str) else None
+    return (None, int(m.group(1)), False) if m else (None, None, True)</code></pre>
+      <p class="cap">거래 ID 없는 실거래가: (시군구, 월) 묶음째 지우고 다시 넣기</p>
+<pre><code>def load_partition(conn, lawd_cd, deal_ymd, fetch):
+    try:
+        conn.execute("DELETE FROM trade WHERE sigungu_code=? AND deal_ym=?", (lawd_cd, deal_ymd))
+        page = 1
+        while rows := rows_from_xml(fetch(lawd_cd, deal_ymd, page)):
+            for r in rows: conn.execute(INSERT_SQL, to_values(r, lawd_cd, deal_ymd))
+            page += 1
+        conn.commit()          # 실행 기록을 남기기 전에 묶음 트랜잭션을 끝낸다
+    except Exception:
+        conn.rollback(); raise</code></pre>
+      <p class="cap">0건을 실패 신호로</p>
+<pre><code>def classify(source, rows, error=None, note=None):
+    if error:
+        return CollectResult(source, rows, "error", str(error))
+    # 0건 = 인증키 미적용·URL 변경·트래픽 초과의 조용한 신호
+    return CollectResult(source, rows, "empty" if rows == 0 else "ok", note)</code></pre>
+      <p class="cap">관심지역 설정 예시 (가상의 예)</p>
+<pre><code>regions:
+  - name: 경기 일부           # 시도 항목: 그 시/도 전체에서 일부 제외
+    sido: 경기
+    exclude_sigungu:
+      - 가평군
+      - 연천군
+  - name: 서울 종로구         # 시군구 항목: 시도 항목의 제외보다 우선
+    code: "11110"
+    sido: 서울
+    sigungu: 종로구</code></pre>
+      <ul>
+        <li>내 조건 파일 예시는 구조만 보여 줍니다: <code>resident_sigungu</code>(5자리 코드), <code>account_months</code>, <code>is_household_head</code>, <code>account_deposit_manwon</code>, <code>ineligible_supply_types</code>(기본값 <code>[]</code>).</li>
+        <li>시군구 5자리 코드(LAWD_CD)는 원칙적으로 실제 실거래가 API로 0건이 아닌지 확인한 것만 표에 싣습니다. 예외로 부천 3구 중 2개(오정구·원미구)는 미검증 표시를 단 채 실려 있습니다.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<!-- 10 -->
+<section id="limits">
+  <h2>한계와 주의</h2>
+  <ul class="limits">
+    <li><b>투자 권유가 아닙니다.</b> 개인 공부와 일정 관리를 위해 만든 도구입니다.</li>
+    <li><b>2026-10-21 기준 제도입니다.</b> 청약 제도는 자주 바뀝니다. 자격 규칙 숫자는 2차 출처로 확인한 값이고 법령 원문과 대조하지 않았습니다.</li>
+    <li><b>해당지역 판정은 단순화했습니다.</b> 거주 시군구 코드가 공고와 같을 때만 해당지역 1순위로 봅니다. 같은 시의 다른 구에 살면 실제로는 해당지역이어도 "기타지역"으로 나올 수 있습니다.</li>
+    <li><b>최종 판단은 모집공고문입니다.</b> 이 시스템의 판정, 안전마진, 공개 페이지 모두 공고문을 대체하지 않습니다.</li>
+    <li><b>가리지 않는 것이 많습니다.</b> 가점, 특별공급, 납입횟수, 무주택 여부, 국민주택 소득·자산 기준, 조정대상지역 과열/위축 구분, 전매제한·실거주 기간.</li>
+    <li><b>알림은 보조입니다.</b> D-3 알림은 그날 배치가 안 돌면 다시 나가지 않습니다. 무순위 접수일 알림은 접수 당일 오전 11시에 옵니다. 노트나 페이지를 직접 보는 습관이 먼저입니다. 수집 실패를 텔레그램으로 알려주는 기능은 아직 없습니다.</li>
+    <li><b>미분양 데이터는 없습니다.</b> R-ONE 인증키를 아직 받지 않았습니다.</li>
+    <li><b>코드는 비공개입니다.</b> 이 가이드의 스니펫은 설명을 위해 줄이거나 바꾼 것입니다.</li>
+  </ul>
+</section>
+
+<footer>
+  청약 데이터 인프라 만드는 법 · 2026-10-21 · 데이터 출처: 청약홈 · 국토교통부 실거래가 · HUG — 공공데이터포털
+</footer>
+
+</div>
+</body>
+</html>
